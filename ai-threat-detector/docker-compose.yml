@@ -1,0 +1,72 @@
+version: '3.7'
+
+services:
+  # Elasticsearch: Store logs
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.9
+    container_name: elasticsearch
+    environment:
+      - node.name=elasticsearch
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    networks:
+      - elk
+
+  # Logstash: Ingest and process logs
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.17.9
+    container_name: logstash
+    volumes:
+      - ./elk-config/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+      - ./elk-config/logstash/pipeline:/usr/share/logstash/pipeline
+    ports:
+      - "5000:5000"
+    networks:
+      - elk
+    depends_on:
+      - elasticsearch
+
+  # Kibana: Visualize logs
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.9
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    networks:
+      - elk
+    depends_on:
+      - elasticsearch
+
+  # Log Generator: Simulates traffic
+  log-generator:
+    build: ./log-generator
+    container_name: log-generator
+    networks:
+      - elk
+    depends_on:
+      - logstash
+
+  # ML Detection Service: Analyzes logs for anomalies
+  ml-detection:
+    build: ./ml-detection
+    container_name: ml-detection
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+    networks:
+      - elk
+    depends_on:
+      - elasticsearch
+
+networks:
+  elk:
+    driver: bridge
