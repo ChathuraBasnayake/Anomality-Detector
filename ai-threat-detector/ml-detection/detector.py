@@ -34,7 +34,12 @@ def fetch_data(window_minutes=10):
     try:
         res = es.search(index="network-logs-*", body=query)
         hits = res['hits']['hits']
-        data = [hit['_source'] for hit in hits]
+        data = []
+        for hit in hits:
+            source = hit['_source']
+            source['_id'] = hit['_id']
+            source['_index'] = hit['_index']
+            data.append(source)
         return pd.DataFrame(data)
     except Exception as e:
         logger.error(f"Error fetching data: {e}")
@@ -100,10 +105,15 @@ def main():
                     anomalies = df[df['is_anomaly'] == -1]
                     if not anomalies.empty:
                         logger.warning(f"⚠️  ALERT: Detected {len(anomalies)} anomalies!")
-                        for _, row in anomalies.iterrows():
+                        for i, row in anomalies.iterrows():
                             logger.error(f"🚨  THREAT DETECTED: IP={row['ip_address']}, Action={row['action']}, Bytes={row['bytes_sent']}")
-                        
-                    # TODO: Write back to ES if needed for persistent tagging
+                            
+                            # Write back to ES
+                            try:
+                                es.update(index=row['_index'], id=row['_id'], body={"doc": {"anomaly_score": row['anomaly_score'], "is_anomaly": int(row['is_anomaly'])}})
+                                logger.info(f"Updated document {row['_id']} with anomaly score.")
+                            except Exception as e:
+                                logger.error(f"Error updating anomaly log: {e}")
             
             time.sleep(60) 
         except Exception as e:
