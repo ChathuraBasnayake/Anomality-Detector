@@ -22,7 +22,7 @@ def fetch_data(window_minutes=10):
     query = {
         "query": {
             "range": {
-                "timestamp": {
+                "@timestamp": {
                     "gte": f"now-{window_minutes}m",
                     "lt": "now"
                 }
@@ -99,10 +99,11 @@ def main():
                     # Log anomalies
                     anomalies = df[df['is_anomaly'] == -1]
                     if not anomalies.empty:
-                        logger.warning(f"Detected {len(anomalies)} anomalies!")
-                        print(anomalies[['ip_address', 'action', 'status', 'bytes_sent']])
+                        logger.warning(f"⚠️  ALERT: Detected {len(anomalies)} anomalies!")
+                        for _, row in anomalies.iterrows():
+                            logger.error(f"🚨  THREAT DETECTED: IP={row['ip_address']}, Action={row['action']}, Bytes={row['bytes_sent']}")
                         
-                    # TODO: Write back to ES
+                    # TODO: Write back to ES if needed for persistent tagging
             
             time.sleep(60) 
         except Exception as e:

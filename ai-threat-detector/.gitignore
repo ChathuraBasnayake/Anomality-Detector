@@ -39,6 +39,7 @@ env/
 
 # Project Specific
 logs/
+ai-doc/
 *.log
 .DS_Store
 
